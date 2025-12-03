@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../firebase";
 import TripMap from "../components/TripMap";
+import DestinationAutocomplete from "../components/DestinationAutocomplete";
 import {
     getTripsForUser,
     createTrip,
@@ -17,15 +18,14 @@ const Dashboard = () => {
     const [trips, setTrips] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // form tạo chuyến đi
     const [tripName, setTripName] = useState("");
     const [destination, setDestination] = useState("");
+    const [destinationPicked, setDestinationPicked] = useState(false);
+    const [destinationError, setDestinationError] = useState("");
 
-    // map
     const [selectedLocation, setSelectedLocation] = useState("Vietnam");
 
     useEffect(() => {
-        // KHÔNG redirect về /login nữa, để ProtectedRoute/AuthContext xử lý.
         const u = auth.currentUser;
         setUser(u || null);
 
@@ -51,17 +51,28 @@ const Dashboard = () => {
     const handleCreateTrip = async () => {
         if (!tripName.trim() || !user) return;
 
+        // ✅ req2: nếu user gõ destination mà không chọn gợi ý thì báo lỗi
+        if (destination.trim() && !destinationPicked) {
+            setDestinationError("Vui lòng chọn đúng địa điểm từ gợi ý.");
+            return;
+        }
+
         try {
-            const newTrip = await createTrip(user.uid, tripName.trim(), destination);
+            const newTrip = await createTrip(
+                user.uid,
+                tripName.trim(),
+                destination
+            );
             setTrips((prev) => [...prev, newTrip]);
 
-            // đưa map tới điểm đến mới
             if (destination) {
                 setSelectedLocation(destination);
             }
 
             setTripName("");
             setDestination("");
+            setDestinationPicked(false);
+            setDestinationError("");
         } catch (err) {
             console.error("Create trip error", err);
         }
@@ -91,7 +102,6 @@ const Dashboard = () => {
 
     return (
         <div className="mt-4">
-            {/* Hàng trên: Map + form tạo chuyến đi */}
             <div className="row">
                 <div className="col-lg-8">
                     <TripMap location={selectedLocation} />
@@ -106,6 +116,7 @@ const Dashboard = () => {
                             <h4 className="text-primary fw-bold mb-3">
                                 ✈️ Tạo chuyến đi mới
                             </h4>
+
                             <div className="mb-2">
                                 <label className="form-label">Tên chuyến đi</label>
                                 <input
@@ -116,19 +127,37 @@ const Dashboard = () => {
                                     onChange={(e) => setTripName(e.target.value)}
                                 />
                             </div>
+
                             <div className="mb-3">
                                 <label className="form-label">Điểm đến chính</label>
-                                <input
-                                    type="text"
-                                    className="form-control rounded-pill px-3"
-                                    placeholder="Ví dụ: Huế, Đà Nẵng, Đà Lạt..."
+
+                                {/* ✅ Autocomplete */}
+                                <DestinationAutocomplete
                                     value={destination}
-                                    onChange={(e) => setDestination(e.target.value)}
+                                    onChange={(val) => {
+                                        setDestination(val);
+                                        setDestinationPicked(false);
+                                        setDestinationError("");
+                                    }}
+                                    onSelect={(val) => {
+                                        setDestination(val);
+                                        setDestinationPicked(true);
+                                        setDestinationError("");
+                                        setSelectedLocation(val);
+                                    }}
                                 />
+
+                                {destinationError && (
+                                    <small className="text-danger d-block mt-1">
+                                        {destinationError}
+                                    </small>
+                                )}
+
                                 <small className="text-muted">
                                     Google Map sẽ tự zoom tới địa điểm này khi tạo chuyến đi.
                                 </small>
                             </div>
+
                             <button
                                 className="btn btn-primary w-100 rounded-pill fw-bold d-flex justify-content-center align-items-center"
                                 onClick={handleCreateTrip}
@@ -140,8 +169,10 @@ const Dashboard = () => {
                 </div>
             </div>
 
-            {/* Danh sách chuyến đi */}
-            <h4 className="mb-3 fw-bold text-success">Danh sách chuyến đi của bạn</h4>
+            <h4 className="mb-3 fw-bold text-success">
+                Danh sách chuyến đi của bạn
+            </h4>
+
             {loading && <p>Đang tải...</p>}
 
             {!loading && trips.length === 0 && (
@@ -153,10 +184,18 @@ const Dashboard = () => {
 
             <div className="row">
                 {trips.map((trip) => {
-                    const isDraft = !trip.meta || !trip.meta?.descriptionText;
-                    const daysCount =
-                        trip.daysCount || (trip.days ? trip.days.length : 0);
+                    const daysCount = trip.daysCount || (trip.days ? trip.days.length : 0);
                     const totalCost = trip.totalCost || 0;
+
+                    const dynamicDesc =
+                        trip.shortSummary ||
+                        trip.meta?.descriptionText ||
+                        trip.meta?.reason ||
+                        trip.meta?.overview ||
+                        "";
+
+                    const isDraft =
+                        trip.status !== "planned" && !dynamicDesc;
 
                     return (
                         <div
@@ -213,8 +252,7 @@ const Dashboard = () => {
                                                     : "Chưa có"}
                                             </p>
                                             <p className="text-muted small mb-3">
-                                                {trip.meta?.shortSummary ||
-                                                    "Hành trình đã được AI tối ưu. Bấm xem chi tiết để chỉnh sửa."}
+                                                {dynamicDesc}
                                             </p>
                                             <div className="mt-auto d-flex gap-2 flex-wrap">
                                                 <button

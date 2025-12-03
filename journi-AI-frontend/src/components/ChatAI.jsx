@@ -1,5 +1,6 @@
 // src/components/ChatAI.jsx
 import React, { useEffect, useRef, useState } from "react";
+import ReactDOM from "react-dom";
 
 const CHAT_API_URL = "http://localhost:5000/api/chat-itinerary";
 
@@ -14,10 +15,7 @@ function ChatAI({ selectedContext, onAddPlace }) {
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
 
-    // gợi ý địa điểm (mode place)
     const [suggestions, setSuggestions] = useState([]);
-
-    // booking hotel
     const [hotelOptions, setHotelOptions] = useState([]);
     const [showHotelModal, setShowHotelModal] = useState(false);
     const [hotelForm, setHotelForm] = useState({
@@ -29,7 +27,6 @@ function ChatAI({ selectedContext, onAddPlace }) {
 
     const messagesRef = useRef(null);
 
-    // ===== context label dùng chung =====
     const currentContextLabel =
         typeof selectedContext === "string"
             ? selectedContext
@@ -37,13 +34,11 @@ function ChatAI({ selectedContext, onAddPlace }) {
             selectedContext?.targetPlaceName ||
             null;
 
-    // ===== Auto scroll xuống cuối mỗi khi có tin mới / gợi ý mới =====
     useEffect(() => {
         if (!messagesRef.current) return;
         messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
     }, [messages, suggestions, showHotelModal]);
 
-    // ===== Reset cuộc trò chuyện =====
     const handleReset = () => {
         setMessages([{ id: "bot-0", role: "bot", text: initialBotMessage }]);
         setSuggestions([]);
@@ -51,7 +46,6 @@ function ChatAI({ selectedContext, onAddPlace }) {
         setInput("");
     };
 
-    // ===== Lưu cuộc trò chuyện vào localStorage =====
     const handleSaveChat = () => {
         try {
             const payload = {
@@ -67,9 +61,7 @@ function ChatAI({ selectedContext, onAddPlace }) {
         }
     };
 
-    // ===== Mở modal đặt khách sạn =====
     const openHotelModal = () => {
-        // nếu chưa có danh sách thì tạo fallback demo dựa trên context
         if (hotelOptions.length === 0) {
             const area = currentContextLabel || "khu vực bạn chọn";
             setHotelOptions([
@@ -107,7 +99,6 @@ function ChatAI({ selectedContext, onAddPlace }) {
 
     const closeHotelModal = () => setShowHotelModal(false);
 
-    // ===== Gửi tin nhắn tới backend AI =====
     const handleSend = async () => {
         const content = input.trim();
         if (!content || loading) return;
@@ -124,7 +115,7 @@ function ChatAI({ selectedContext, onAddPlace }) {
         try {
             const payload = {
                 message: content,
-                mode, // "place" hoặc "hotel"
+                mode,
                 selectedContext,
             };
 
@@ -138,7 +129,7 @@ function ChatAI({ selectedContext, onAddPlace }) {
             try {
                 data = await res.json();
             } catch (err) {
-                console.warn("Không parse được JSON từ backend, dùng nội dung fallback.");
+                console.warn("Không parse được JSON từ backend.");
             }
 
             const isHotelMode = mode === "hotel";
@@ -158,7 +149,6 @@ function ChatAI({ selectedContext, onAddPlace }) {
 
             const newMessages = [...messages, userMessage, botMessage];
 
-            // Nếu là mode hotel: thêm bubble có nút mở form
             if (isHotelMode) {
                 newMessages.push({
                     id: `bot-form-${Date.now()}`,
@@ -170,9 +160,7 @@ function ChatAI({ selectedContext, onAddPlace }) {
 
             setMessages(newMessages);
 
-            // ----- Xử lý suggestions / hotels -----
             if (!isHotelMode) {
-                // MODE PLACE – gợi ý địa điểm
                 if (Array.isArray(data?.suggestions)) {
                     const normalized = data.suggestions.map((s, index) => ({
                         id: s.id || `sg-${Date.now()}-${index}`,
@@ -184,7 +172,6 @@ function ChatAI({ selectedContext, onAddPlace }) {
                     setSuggestions(normalized);
                 }
             } else {
-                // MODE HOTEL – gợi ý khách sạn (dùng cho modal)
                 const area = currentContextLabel || "khu vực bạn chọn";
 
                 let hotels = [];
@@ -237,7 +224,6 @@ function ChatAI({ selectedContext, onAddPlace }) {
                 }
 
                 setHotelOptions(hotels);
-                // không cần suggestions trong mode hotel
                 setSuggestions([]);
             }
         } catch (err) {
@@ -253,7 +239,6 @@ function ChatAI({ selectedContext, onAddPlace }) {
         }
     };
 
-    // Enter để gửi, Shift+Enter để xuống dòng
     const handleKeyDown = (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
@@ -261,11 +246,8 @@ function ChatAI({ selectedContext, onAddPlace }) {
         }
     };
 
-    // Đưa gợi ý địa điểm (mode place) vào lịch trình chính
     const handleAddSuggestionToPlan = (sug) => {
-        if (onAddPlace) {
-            onAddPlace(sug);
-        }
+        if (onAddPlace) onAddPlace(sug);
     };
 
     const inputPlaceholder = currentContextLabel
@@ -277,7 +259,6 @@ function ChatAI({ selectedContext, onAddPlace }) {
             ? 'VD: "gợi ý địa điểm ăn uống quanh Hồ Gươm"'
             : 'VD: "tôi cần khách sạn 2 người, budget 800k/đêm gần phố cổ"';
 
-    // ========= Xử lý form đặt khách sạn =========
     const selectedHotel =
         hotelOptions.find((h) => h.id === hotelForm.hotelId) || null;
 
@@ -291,7 +272,6 @@ function ChatAI({ selectedContext, onAddPlace }) {
             alert("Vui lòng chọn khách sạn và điền đầy đủ họ tên, số điện thoại.");
             return;
         }
-        // Demo: chỉ alert, không gọi backend
         alert(
             `Đặt khách sạn thành công!\n\nKhách sạn: ${selectedHotel?.name || ""
             }\nKhách: ${hotelForm.fullName}\nSĐT: ${hotelForm.phone}`
@@ -299,10 +279,102 @@ function ChatAI({ selectedContext, onAddPlace }) {
         setShowHotelModal(false);
     };
 
+    const HotelModal = showHotelModal
+        ? ReactDOM.createPortal(
+            <div className="hotel-modal-backdrop" onClick={closeHotelModal}>
+                <div className="hotel-modal" onClick={(e) => e.stopPropagation()}>
+                    <h5 className="mb-3">
+                        Đặt khách sạn{" "}
+                        {currentContextLabel ? `gần ${currentContextLabel}` : ""}
+                    </h5>
+                    <form onSubmit={handleSubmitHotelBooking}>
+                        <div className="mb-3">
+                            <label className="form-label">Chọn khách sạn</label>
+                            <select
+                                className="form-select"
+                                value={hotelForm.hotelId}
+                                onChange={(e) =>
+                                    handleHotelFormChange("hotelId", e.target.value)
+                                }
+                            >
+                                <option value="">-- Chọn khách sạn --</option>
+                                {hotelOptions.map((h) => (
+                                    <option key={h.id} value={h.id}>
+                                        {h.name}
+                                    </option>
+                                ))}
+                            </select>
+                            {selectedHotel && (
+                                <small className="text-muted d-block mt-1">
+                                    {selectedHotel.address} · {selectedHotel.priceRange}
+                                    {selectedHotel.description
+                                        ? ` · ${selectedHotel.description}`
+                                        : ""}
+                                </small>
+                            )}
+                        </div>
+
+                        <div className="mb-2">
+                            <label className="form-label">Họ và tên</label>
+                            <input
+                                type="text"
+                                className="form-control"
+                                value={hotelForm.fullName}
+                                onChange={(e) =>
+                                    handleHotelFormChange("fullName", e.target.value)
+                                }
+                                placeholder="Nguyễn Văn A"
+                            />
+                        </div>
+
+                        <div className="mb-2">
+                            <label className="form-label">Số điện thoại</label>
+                            <input
+                                type="tel"
+                                className="form-control"
+                                value={hotelForm.phone}
+                                onChange={(e) =>
+                                    handleHotelFormChange("phone", e.target.value)
+                                }
+                                placeholder="0xxxxxxxxx"
+                            />
+                        </div>
+
+                        <div className="mb-3">
+                            <label className="form-label">Email (tuỳ chọn)</label>
+                            <input
+                                type="email"
+                                className="form-control"
+                                value={hotelForm.email}
+                                onChange={(e) =>
+                                    handleHotelFormChange("email", e.target.value)
+                                }
+                                placeholder="you@example.com"
+                            />
+                        </div>
+
+                        <div className="d-flex justify-content-end gap-2">
+                            <button
+                                type="button"
+                                className="btn btn-outline-secondary"
+                                onClick={closeHotelModal}
+                            >
+                                Đóng
+                            </button>
+                            <button type="submit" className="btn btn-primary">
+                                Đặt khách sạn
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>,
+            document.body
+        )
+        : null;
+
     return (
         <>
             <div className="chat-ai-body">
-                {/* Header */}
                 <div className="d-flex justify-content-between align-items-center chat-ai-header mb-2">
                     <div>
                         <h4 className="mb-0">Trợ lý AI</h4>
@@ -330,7 +402,6 @@ function ChatAI({ selectedContext, onAddPlace }) {
                     </div>
                 </div>
 
-                {/* Nhóm nút chế độ */}
                 <div className="d-flex gap-2 mb-3">
                     <button
                         type="button"
@@ -354,18 +425,15 @@ function ChatAI({ selectedContext, onAddPlace }) {
                     </button>
                 </div>
 
-                {/* Nếu có context đang chọn cho AI */}
                 {currentContextLabel && (
                     <div className="chat-context-box mb-2">
                         <strong>Đang chọn cho Trợ lý AI:</strong> {currentContextLabel}
                     </div>
                 )}
 
-                {/* Vùng chat + gợi ý trong 1 khung cuộn */}
                 <div ref={messagesRef} className="chat-ai-scroll-area mb-2">
                     <div className="chat-ai-messages">
                         {messages.map((m) => {
-                            // Bubble đặc biệt có nút "Mình gửi cho bạn cái form này"
                             if (m.type === "hotelForm") {
                                 return (
                                     <div
@@ -374,9 +442,7 @@ function ChatAI({ selectedContext, onAddPlace }) {
                                     >
                                         <div className="chat-ai-bubble">
                                             <div className="fw-semibold small mb-1">Journi-bot</div>
-                                            <div className="chat-bubble-body small mb-2">
-                                                {m.text}
-                                            </div>
+                                            <div className="chat-bubble-body small mb-2">{m.text}</div>
                                             <button
                                                 type="button"
                                                 className="btn btn-sm btn-primary"
@@ -417,14 +483,13 @@ function ChatAI({ selectedContext, onAddPlace }) {
                         )}
                     </div>
 
-                    {/* Gợi ý địa điểm (mode place) */}
                     {suggestions.length > 0 && (
                         <div className="chat-ai-suggestions-box mt-2">
                             <div className="small text-muted mb-1">
                                 Các gợi ý địa điểm cho bạn:
                             </div>
                             <div className="chat-ai-suggestions">
-                                {suggestions.map((sug, idx) => (
+                                {suggestions.map((sug) => (
                                     <div
                                         key={sug.id}
                                         className="card mb-1 place-suggestion-item border-0"
@@ -445,7 +510,8 @@ function ChatAI({ selectedContext, onAddPlace }) {
                                             )}
                                             {typeof sug.cost === "number" && sug.cost > 0 && (
                                                 <p className="small mb-0 text-muted">
-                                                    Chi phí ước tính: {sug.cost.toLocaleString("vi-VN")} đ
+                                                    Chi phí ước tính:{" "}
+                                                    {sug.cost.toLocaleString("vi-VN")} đ
                                                 </p>
                                             )}
                                         </div>
@@ -456,7 +522,6 @@ function ChatAI({ selectedContext, onAddPlace }) {
                     )}
                 </div>
 
-                {/* Ô nhập & nút Gửi */}
                 <div className="chat-ai-input mt-auto">
                     <div className="input-group">
                         <textarea
@@ -480,96 +545,8 @@ function ChatAI({ selectedContext, onAddPlace }) {
                 </div>
             </div>
 
-            {/* ===== MODAL ĐẶT KHÁCH SẠN ===== */}
-            {showHotelModal && (
-                <div className="hotel-modal-backdrop" onClick={closeHotelModal}>
-                    <div className="hotel-modal" onClick={(e) => e.stopPropagation()}>
-                        <h5 className="mb-3">
-                            Đặt khách sạn{" "}
-                            {currentContextLabel ? `gần ${currentContextLabel}` : ""}
-                        </h5>
-                        <form onSubmit={handleSubmitHotelBooking}>
-                            <div className="mb-3">
-                                <label className="form-label">Chọn khách sạn</label>
-                                <select
-                                    className="form-select"
-                                    value={hotelForm.hotelId}
-                                    onChange={(e) =>
-                                        handleHotelFormChange("hotelId", e.target.value)
-                                    }
-                                >
-                                    <option value="">-- Chọn khách sạn --</option>
-                                    {hotelOptions.map((h) => (
-                                        <option key={h.id} value={h.id}>
-                                            {h.name}
-                                        </option>
-                                    ))}
-                                </select>
-                                {selectedHotel && (
-                                    <small className="text-muted d-block mt-1">
-                                        {selectedHotel.address} · {selectedHotel.priceRange}
-                                        {selectedHotel.description
-                                            ? ` · ${selectedHotel.description}`
-                                            : ""}
-                                    </small>
-                                )}
-                            </div>
-
-                            <div className="mb-2">
-                                <label className="form-label">Họ và tên</label>
-                                <input
-                                    type="text"
-                                    className="form-control"
-                                    value={hotelForm.fullName}
-                                    onChange={(e) =>
-                                        handleHotelFormChange("fullName", e.target.value)
-                                    }
-                                    placeholder="Nguyễn Văn A"
-                                />
-                            </div>
-
-                            <div className="mb-2">
-                                <label className="form-label">Số điện thoại</label>
-                                <input
-                                    type="tel"
-                                    className="form-control"
-                                    value={hotelForm.phone}
-                                    onChange={(e) =>
-                                        handleHotelFormChange("phone", e.target.value)
-                                    }
-                                    placeholder="0xxxxxxxxx"
-                                />
-                            </div>
-
-                            <div className="mb-3">
-                                <label className="form-label">Email (tuỳ chọn)</label>
-                                <input
-                                    type="email"
-                                    className="form-control"
-                                    value={hotelForm.email}
-                                    onChange={(e) =>
-                                        handleHotelFormChange("email", e.target.value)
-                                    }
-                                    placeholder="you@example.com"
-                                />
-                            </div>
-
-                            <div className="d-flex justify-content-end gap-2">
-                                <button
-                                    type="button"
-                                    className="btn btn-outline-secondary"
-                                    onClick={closeHotelModal}
-                                >
-                                    Đóng
-                                </button>
-                                <button type="submit" className="btn btn-primary">
-                                    Đặt khách sạn
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+            {/* ✅ Modal render bằng Portal để không bị cắt/clip */}
+            {HotelModal}
         </>
     );
 }

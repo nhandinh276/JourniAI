@@ -35,9 +35,7 @@ const Navbar = () => {
                                 Trang chính
                             </Link>
 
-                            <Link className="btn btn-outline-light me-2" to="/places">
-                                Địa điểm
-                            </Link>
+                            {/* ✅ ĐÃ XÓA NÚT "Địa điểm" THEO YÊU CẦU 3 */}
 
                             <button
                                 className="btn btn-light text-primary fw-bold"

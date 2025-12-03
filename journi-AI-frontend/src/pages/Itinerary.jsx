@@ -1,7 +1,7 @@
 // src/pages/Itinerary.jsx
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { FaEye, FaEyeSlash, FaEdit, FaTrash } from "react-icons/fa";
+import { FaEye, FaEyeSlash, FaEdit, FaTrash, FaFilePdf } from "react-icons/fa";
 import ChatAI from "../components/ChatAI";
 import {
     getTripById,
@@ -9,6 +9,53 @@ import {
     deleteTrip,
     generateItineraryAI,
 } from "../services/tripService";
+import { exportItineraryToPDF } from "../utils/pdfExporter";
+
+// ===== helpers =====
+const parseTimeRange = (timeStr = "") => {
+    // accept "07:00 – 08:30" or "07:00-08:30"
+    const m = timeStr.replace("–", "-").split("-").map(s => s.trim());
+    if (m.length !== 2) return null;
+    const [start, end] = m;
+    if (!start || !end) return null;
+    return { start, end };
+};
+
+const timeToMinutes = (t) => {
+    const [h, m] = t.split(":").map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return null;
+    return h * 60 + m;
+};
+
+const clampSuggestionTime = (selectedRange, suggestionTime) => {
+    if (!selectedRange) return suggestionTime || "";
+    const sr = selectedRange;
+    if (!suggestionTime) return `${sr.start} – ${sr.end}`;
+
+    const sugRange = parseTimeRange(suggestionTime);
+    if (!sugRange) return `${sr.start} – ${sr.end}`;
+
+    const s1 = timeToMinutes(sugRange.start);
+    const s2 = timeToMinutes(sugRange.end);
+    const r1 = timeToMinutes(sr.start);
+    const r2 = timeToMinutes(sr.end);
+    if (s1 == null || s2 == null || r1 == null || r2 == null)
+        return `${sr.start} – ${sr.end}`;
+
+    // if outside -> clamp inside selected range
+    if (s1 < r1 || s2 > r2) return `${sr.start} – ${sr.end}`;
+    return suggestionTime;
+};
+
+const sumAiCosts = (days = []) => {
+    let sum = 0;
+    days.forEach(d => {
+        (d.places || []).forEach(p => {
+            if (p.isAiSuggestion && typeof p.cost === "number") sum += p.cost;
+        });
+    });
+    return sum;
+};
 
 const Itinerary = () => {
     const { id } = useParams();
@@ -17,7 +64,6 @@ const Itinerary = () => {
     const [trip, setTrip] = useState(null);
     const [loadingTrip, setLoadingTrip] = useState(true);
 
-    // form mô tả chuyến đi
     const [form, setForm] = useState({
         numDays: 3,
         budget: "",
@@ -26,30 +72,22 @@ const Itinerary = () => {
         overview: "",
     });
 
-    // danh sách các lịch trình AI đã tạo
-    const [plans, setPlans] = useState([]); // {id, title, totalCost, shortSummary, days, formSnapshot, collapsed}
+    const [plans, setPlans] = useState([]);
     const [loadingAI, setLoadingAI] = useState(false);
     const [rewriting, setRewriting] = useState(false);
 
-    // hiển thị form mô tả hay không
     const [showForm, setShowForm] = useState(true);
     const [showPlans, setShowPlans] = useState(false);
 
-    // chọn địa điểm cho Trợ lý AI
     const [selectedPlaceForAI, setSelectedPlaceForAI] = useState(null);
-
-    // modal chi tiết địa điểm (double-click)
     const [detailPlace, setDetailPlace] = useState(null);
 
-    // ================== helpers ==================
     const getPlacePhotoUrl = (placeName) => {
         const destination = trip?.destination || trip?.name || "";
         const query = encodeURIComponent(`${placeName} ${destination}`);
-        // Unsplash random ảnh theo từ khoá, không cần API key
         return `https://source.unsplash.com/800x450/?${query}`;
     };
 
-    // ================== Lấy dữ liệu chuyến đi từ Firestore ==================
     useEffect(() => {
         const fetchTrip = async () => {
             try {
@@ -73,12 +111,17 @@ const Itinerary = () => {
                         id: p.id,
                         title: p.title,
                         totalCost: p.totalCost ?? null,
+                        extraCost:
+                            typeof p.extraCost === "number"
+                                ? p.extraCost
+                                : sumAiCosts(p.days || []),
                         shortSummary: p.shortSummary || "",
                         days: p.days || [],
                         formSnapshot: p.formSnapshot || meta || null,
                         collapsed: !!p.collapsed,
                     }));
                 } else if (Array.isArray(t?.days) && t.days.length > 0) {
+                    const extraCost = sumAiCosts(t.days);
                     initialPlans = [
                         {
                             id: "initial",
@@ -86,6 +129,7 @@ const Itinerary = () => {
                                 meta.reason ||
                                 `Hành trình ${t.destination || t.name || "mới"}`,
                             totalCost: t.totalCost ?? null,
+                            extraCost,
                             shortSummary: t.shortSummary || "",
                             days: t.days,
                             formSnapshot: meta,
@@ -110,7 +154,6 @@ const Itinerary = () => {
         fetchTrip();
     }, [id]);
 
-    // ================== Xử lý form mô tả ==================
     const handleChange = (field, value) => {
         setForm((prev) => ({ ...prev, [field]: value }));
     };
@@ -122,14 +165,11 @@ const Itinerary = () => {
         }
         setRewriting(true);
         try {
-            const res = await fetch(
-                "http://localhost:5000/api/rewrite-description",
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ description: form.overview }),
-                }
-            );
+            const res = await fetch("http://localhost:5000/api/rewrite-description", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ description: form.overview }),
+            });
             if (!res.ok) throw new Error("rewrite failed " + res.status);
             const data = await res.json();
             if (data.text) {
@@ -143,7 +183,6 @@ const Itinerary = () => {
         }
     };
 
-    // ================== Gọi AI tạo lịch trình ==================
     const handleGenerateByAI = async () => {
         if (!trip) return;
 
@@ -174,6 +213,7 @@ const Itinerary = () => {
                 id: Date.now().toString(),
                 title,
                 totalCost: typeof totalCost === "number" ? totalCost : null,
+                extraCost: 0,
                 shortSummary: shortSummary || "",
                 days: days || [],
                 formSnapshot: { ...form },
@@ -191,12 +231,14 @@ const Itinerary = () => {
                 ...trip,
                 days: newPlan.days,
                 totalCost: newPlan.totalCost,
+                extraCost: newPlan.extraCost,
                 shortSummary: newPlan.shortSummary,
-                meta: { ...form },
+                meta: { ...form, descriptionText: newPlan.shortSummary }, // ✅ req1
                 plans: nextPlans.map((p) => ({
                     id: p.id,
                     title: p.title,
                     totalCost: p.totalCost,
+                    extraCost: p.extraCost || 0,
                     shortSummary: p.shortSummary,
                     days: p.days,
                     formSnapshot: p.formSnapshot,
@@ -228,6 +270,7 @@ const Itinerary = () => {
                     id: p.id,
                     title: p.title,
                     totalCost: p.totalCost,
+                    extraCost: p.extraCost || 0,
                     shortSummary: p.shortSummary,
                     days: p.days,
                     formSnapshot: p.formSnapshot,
@@ -247,7 +290,7 @@ const Itinerary = () => {
     const handleCreateAnotherPlan = () => {
         setPlans((prev) => prev.map((p) => ({ ...p, collapsed: true })));
         setShowPlans(true);
-        setShowForm(true); // mở lại form để mô tả lịch trình mới
+        setShowForm(true);
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
@@ -285,7 +328,6 @@ const Itinerary = () => {
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
-    // xoá 1 plan trong danh sách
     const handleDeletePlan = (planId) => {
         if (!window.confirm("Bạn có chắc muốn xoá lịch trình này?")) return;
 
@@ -293,11 +335,11 @@ const Itinerary = () => {
         setPlans(remaining);
 
         if (remaining.length === 0) {
-            // không còn plan nào
             const updatedTrip = {
                 ...trip,
                 days: [],
                 totalCost: 0,
+                extraCost: 0,
                 shortSummary: "",
                 plans: [],
                 status: "draft",
@@ -310,11 +352,13 @@ const Itinerary = () => {
                 ...trip,
                 days: activePlan.days || [],
                 totalCost: activePlan.totalCost || 0,
+                extraCost: activePlan.extraCost || 0,
                 shortSummary: activePlan.shortSummary || "",
                 plans: remaining.map((p) => ({
                     id: p.id,
                     title: p.title,
                     totalCost: p.totalCost,
+                    extraCost: p.extraCost || 0,
                     shortSummary: p.shortSummary,
                     days: p.days,
                     formSnapshot: p.formSnapshot,
@@ -326,7 +370,6 @@ const Itinerary = () => {
         }
     };
 
-    // xoá toàn bộ trip
     const handleDeleteTripAll = async () => {
         if (!trip) return;
         if (!window.confirm("Xoá toàn bộ hành trình này?")) return;
@@ -339,16 +382,17 @@ const Itinerary = () => {
         }
     };
 
-    // chọn địa điểm cho Trợ lý AI (click 1 lần)
+    // ✅ lưu thêm targetPlaceId + time để insert đúng vị trí (req6)
     const handlePlaceClick = (day, place) => {
         setSelectedPlaceForAI({
+            targetPlaceId: place.id || place.name,
             targetPlaceName: place.name,
+            targetPlaceTime: place.time || "",
             targetDayNumber: day.dayNumber,
             text: `Ngày ${day.dayNumber} – ${place.name}`,
         });
     };
 
-    // double-click: mở modal chi tiết
     const handlePlaceDoubleClick = (day, place) => {
         setDetailPlace({
             dayNumber: day.dayNumber,
@@ -356,12 +400,12 @@ const Itinerary = () => {
         });
     };
 
-    // ===== Thêm điểm gợi ý từ Trợ lý AI vào NGÀY ĐANG CHỌN =====
+    // ✅ req6 + req7: insert after selected place & add extraCost
     const handleAddPlaceFromAI = async (suggestion) => {
         if (!trip) return;
-        if (!selectedPlaceForAI || !selectedPlaceForAI.targetDayNumber) {
+        if (!selectedPlaceForAI?.targetDayNumber) {
             alert(
-                "Hãy chọn một địa điểm / ngày ở cột bên trái (Đang chọn cho Trợ lý AI) trước khi thêm gợi ý."
+                "Hãy chọn một địa điểm / ngày ở cột bên trái trước khi thêm gợi ý."
             );
             return;
         }
@@ -372,7 +416,6 @@ const Itinerary = () => {
 
         const dayNumber = selectedPlaceForAI.targetDayNumber;
 
-        // chuẩn hoá dữ liệu gợi ý
         const suggestionName =
             typeof suggestion === "string"
                 ? suggestion
@@ -383,33 +426,17 @@ const Itinerary = () => {
                 ? suggestion.description
                 : `Gợi ý này được tạo từ yêu cầu bạn gửi cho Journi-bot ở ngày ${dayNumber}.`;
 
-        const suggestionTime =
-            typeof suggestion === "object" && suggestion.time
-                ? suggestion.time
-                : "";
+        const rawSugTime =
+            typeof suggestion === "object" && suggestion.time ? suggestion.time : "";
 
         const suggestionCost =
             typeof suggestion === "object" && typeof suggestion.cost === "number"
                 ? suggestion.cost
                 : 0;
 
-        // kiểm tra trùng trong ngày
-        const currentDayInActive =
-            (activePlan.days || []).find((d) => d.dayNumber === dayNumber) || null;
+        const selectedRange = parseTimeRange(selectedPlaceForAI.targetPlaceTime);
+        const suggestionTime = clampSuggestionTime(selectedRange, rawSugTime);
 
-        if (
-            currentDayInActive &&
-            (currentDayInActive.places || []).some(
-                (p) => p.isAiSuggestion && p.name === suggestionName
-            )
-        ) {
-            alert(
-                `Gợi ý "${suggestionName}" đã có trong ngày ${dayNumber}. Bạn thử chọn gợi ý khác nhé.`
-            );
-            return;
-        }
-
-        // tạo id ổn định cho place
         const newId =
             typeof crypto !== "undefined" && crypto.randomUUID
                 ? crypto.randomUUID()
@@ -429,6 +456,12 @@ const Itinerary = () => {
             const targetDay = { ...(days[dayIndex] || { dayNumber, places: [] }) };
             const places = [...(targetDay.places || [])];
 
+            // find selected place index
+            const selectedIdx = places.findIndex((pl) => {
+                const key = pl.id || pl.name;
+                return key === selectedPlaceForAI.targetPlaceId;
+            });
+
             const newPlace = {
                 id: newId,
                 name: suggestionName,
@@ -438,11 +471,20 @@ const Itinerary = () => {
                 isAiSuggestion: true,
             };
 
-            places.push(newPlace);
+            if (selectedIdx >= 0) {
+                places.splice(selectedIdx + 1, 0, newPlace); // ✅ insert right after
+            } else {
+                places.push(newPlace);
+            }
+
             targetDay.places = places;
             days[dayIndex] = targetDay;
 
-            return { ...p, days };
+            return {
+                ...p,
+                days,
+                extraCost: (p.extraCost || 0) + suggestionCost, // ✅ req7
+            };
         });
 
         setPlans(newPlans);
@@ -453,10 +495,14 @@ const Itinerary = () => {
         const updatedTrip = {
             ...trip,
             days: activeAfter?.days || [],
+            totalCost: activeAfter?.totalCost || 0,
+            extraCost: activeAfter?.extraCost || 0,
+            shortSummary: activeAfter?.shortSummary || "",
             plans: newPlans.map((p) => ({
                 id: p.id,
                 title: p.title,
                 totalCost: p.totalCost,
+                extraCost: p.extraCost || 0,
                 shortSummary: p.shortSummary,
                 days: p.days,
                 formSnapshot: p.formSnapshot,
@@ -468,9 +514,10 @@ const Itinerary = () => {
         await saveTrip(updatedTrip);
     };
 
-    // Xoá 1 gợi ý AI trong ngày
     const handleDeleteAiSuggestion = async (planId, dayNumber, placeKey) => {
         if (!trip) return;
+
+        let removedCost = 0;
 
         const updatedPlans = plans.map((p) => {
             if (p.id !== planId) return p;
@@ -478,20 +525,25 @@ const Itinerary = () => {
             const days = (p.days || []).map((d) => {
                 if (d.dayNumber !== dayNumber) return d;
 
-                return {
-                    ...d,
-                    places: (d.places || []).filter((pl) => {
-                        if (!pl.isAiSuggestion) return true;
-                        if (pl.id) {
-                            return pl.id !== placeKey;
-                        }
-                        // fallback nếu place cũ chưa có id
-                        return pl.name !== placeKey;
-                    }),
-                };
+                const nextPlaces = (d.places || []).filter((pl) => {
+                    if (!pl.isAiSuggestion) return true;
+
+                    const key = pl.id || pl.name;
+                    if (key === placeKey) {
+                        removedCost += typeof pl.cost === "number" ? pl.cost : 0;
+                        return false;
+                    }
+                    return true;
+                });
+
+                return { ...d, places: nextPlaces };
             });
 
-            return { ...p, days };
+            return {
+                ...p,
+                days,
+                extraCost: Math.max(0, (p.extraCost || 0) - removedCost),
+            };
         });
 
         setPlans(updatedPlans);
@@ -502,10 +554,13 @@ const Itinerary = () => {
         const newTrip = {
             ...trip,
             days: activeAfter?.days || [],
+            totalCost: activeAfter?.totalCost || 0,
+            extraCost: activeAfter?.extraCost || 0,
             plans: updatedPlans.map((p) => ({
                 id: p.id,
                 title: p.title,
                 totalCost: p.totalCost,
+                extraCost: p.extraCost || 0,
                 shortSummary: p.shortSummary,
                 days: p.days,
                 formSnapshot: p.formSnapshot,
@@ -523,17 +578,11 @@ const Itinerary = () => {
         return <p className="text-center mt-5">Không tìm thấy hành trình.</p>;
 
     const destinationLabel = trip.destination || trip.name || "chuyến đi";
-    const selectedContextLabel =
-        typeof selectedPlaceForAI === "string"
-            ? selectedPlaceForAI
-            : selectedPlaceForAI?.text || "";
 
     return (
         <div className="container my-4 itinerary-page">
             <div className="row g-4">
-                {/* ================== Cột trái ================== */}
                 <div className="col-lg-8">
-                    {/* Nút back + xoá hành trình */}
                     <div className="d-flex justify-content-between align-items-center mb-3">
                         <button
                             className="btn btn-link px-0"
@@ -552,7 +601,6 @@ const Itinerary = () => {
                         </button>
                     </div>
 
-                    {/* ----- FORM MÔ TẢ: chỉ hiện khi showForm = true ----- */}
                     {showForm && (
                         <div className="card shadow-sm border-0 itinerary-card mb-4">
                             <div className="card-body">
@@ -671,7 +719,6 @@ const Itinerary = () => {
                         </div>
                     )}
 
-                    {/* ----- LỊCH TRÌNH CHI TIẾT: chỉ hiện khi showPlans = true ----- */}
                     {showPlans && plans.length > 0 && (
                         <section className="mt-2">
                             <div className="d-flex justify-content-between align-items-center mb-3">
@@ -685,166 +732,186 @@ const Itinerary = () => {
                                 </button>
                             </div>
 
-                            {plans.map((plan) => (
-                                <div
-                                    key={plan.id}
-                                    className="card border-0 shadow-sm mb-3 plan-card"
-                                >
-                                    <div className="card-header bg-transparent d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <h5 className="mb-1 text-capitalize">{plan.title}</h5>
-                                            {plan.shortSummary && (
-                                                <p className="mb-1 small text-muted">
-                                                    {plan.shortSummary}
-                                                </p>
-                                            )}
-                                            {typeof plan.totalCost === "number" && (
+                            {plans.map((plan) => {
+                                const baseCost = typeof plan.totalCost === "number" ? plan.totalCost : 0;
+                                const extraCost = typeof plan.extraCost === "number" ? plan.extraCost : 0;
+                                const grandTotal = baseCost + extraCost;
+
+                                return (
+                                    <div
+                                        key={plan.id}
+                                        className="card border-0 shadow-sm mb-3 plan-card"
+                                    >
+                                        <div className="card-header bg-transparent d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h5 className="mb-1 text-capitalize">{plan.title}</h5>
+                                                {plan.shortSummary && (
+                                                    <p className="mb-1 small text-muted">
+                                                        {plan.shortSummary}
+                                                    </p>
+                                                )}
+
                                                 <p className="mb-0 small text-muted">
                                                     Ước tính tổng chi phí:{" "}
-                                                    <strong>
-                                                        {plan.totalCost.toLocaleString("vi-VN")} đ
-                                                    </strong>
+                                                    <strong>{baseCost.toLocaleString("vi-VN")} đ</strong>
                                                 </p>
-                                            )}
-                                        </div>
-                                        <div className="d-flex gap-2">
-                                            <button
-                                                className="btn btn-outline-secondary btn-sm"
-                                                type="button"
-                                                title={
-                                                    plan.collapsed
-                                                        ? "Hiện lịch trình"
-                                                        : "Thu nhỏ lịch trình"
-                                                }
-                                                onClick={() => togglePlanVisibility(plan.id)}
-                                            >
-                                                {plan.collapsed ? <FaEye /> : <FaEyeSlash />}
-                                            </button>
-                                            <button
-                                                className="btn btn-outline-primary btn-sm d-flex align-items-center"
-                                                type="button"
-                                                onClick={() =>
-                                                    handleEditDescriptionFromPlan(plan.id)
-                                                }
-                                            >
-                                                <FaEdit className="me-1" /> Chỉnh sửa mô tả
-                                            </button>
-                                            <button
-                                                className="btn btn-outline-danger btn-sm"
-                                                type="button"
-                                                onClick={() => handleDeletePlan(plan.id)}
-                                            >
-                                                <FaTrash />
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {!plan.collapsed && (
-                                        <div className="card-body">
-                                            {!plan.days ||
-                                                plan.days.length === 0 ||
-                                                plan.days.every(
-                                                    (d) => !d.places || d.places.length === 0
-                                                ) ? (
-                                                <p className="text-muted">
-                                                    Lịch trình chưa có ngày nào. Hãy tạo bằng AI hoặc
-                                                    thêm địa điểm từ Trợ lý AI.
+                                                <p className="mb-0 small text-muted">
+                                                    Chi phí phát sinh:{" "}
+                                                    <strong>{extraCost.toLocaleString("vi-VN")} đ</strong>
                                                 </p>
-                                            ) : (
-                                                plan.days
-                                                    .filter((d) => d.places && d.places.length > 0)
-                                                    .map((day) => (
-                                                        <div key={day.dayNumber} className="mb-3">
-                                                            <h6 className="fw-bold">
-                                                                Ngày {day.dayNumber}
-                                                            </h6>
-                                                            {day.places.map((place) => {
-                                                                const isActive =
-                                                                    selectedPlaceForAI &&
-                                                                    selectedPlaceForAI.targetPlaceName ===
-                                                                    place.name &&
-                                                                    selectedPlaceForAI.targetDayNumber ===
-                                                                    day.dayNumber;
+                                                <p className="mb-0 small text-muted">
+                                                    Tổng tất cả chi phí:{" "}
+                                                    <strong>{grandTotal.toLocaleString("vi-VN")} đ</strong>
+                                                </p>
+                                            </div>
 
-                                                                const isAi = place.isAiSuggestion;
+                                            <div className="d-flex gap-2">
+                                                <button
+                                                    className="btn btn-outline-secondary btn-sm"
+                                                    type="button"
+                                                    title={plan.collapsed ? "Hiện lịch trình" : "Thu nhỏ lịch trình"}
+                                                    onClick={() => togglePlanVisibility(plan.id)}
+                                                >
+                                                    {plan.collapsed ? <FaEye /> : <FaEyeSlash />}
+                                                </button>
 
-                                                                return (
-                                                                    <div
-                                                                        key={place.id || place.name}
-                                                                        className={
-                                                                            "border rounded-3 p-2 mb-2 bg-white place-card " +
-                                                                            (isActive ? "place-card-active " : "") +
-                                                                            (isAi ? "place-card-ai " : "")
-                                                                        }
-                                                                        onClick={() =>
-                                                                            handlePlaceClick(day, place)
-                                                                        }
-                                                                        onDoubleClick={() =>
-                                                                            handlePlaceDoubleClick(day, place)
-                                                                        }
-                                                                    >
-                                                                        <div className="d-flex justify-content-between align-items-start">
-                                                                            <div>
+                                                <button
+                                                    className="btn btn-outline-primary btn-sm d-flex align-items-center"
+                                                    type="button"
+                                                    onClick={() => handleEditDescriptionFromPlan(plan.id)}
+                                                >
+                                                    <FaEdit className="me-1" /> Chỉnh sửa mô tả
+                                                </button>
+
+                                                <button
+                                                    className="btn btn-outline-success btn-sm d-flex align-items-center"
+                                                    type="button"
+                                                    onClick={() =>
+                                                        exportItineraryToPDF({
+                                                            name: plan.title,
+                                                            days: plan.days || [],
+                                                        })
+                                                    }
+                                                >
+                                                    <FaFilePdf className="me-1" /> Xuất PDF
+                                                </button>
+
+                                                <button
+                                                    className="btn btn-outline-danger btn-sm"
+                                                    type="button"
+                                                    onClick={() => handleDeletePlan(plan.id)}
+                                                >
+                                                    <FaTrash />
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {!plan.collapsed && (
+                                            <div className="card-body">
+                                                {!plan.days ||
+                                                    plan.days.length === 0 ||
+                                                    plan.days.every(
+                                                        (d) => !d.places || d.places.length === 0
+                                                    ) ? (
+                                                    <p className="text-muted">
+                                                        Lịch trình chưa có ngày nào. Hãy tạo bằng AI hoặc
+                                                        thêm địa điểm từ Trợ lý AI.
+                                                    </p>
+                                                ) : (
+                                                    plan.days
+                                                        .filter((d) => d.places && d.places.length > 0)
+                                                        .map((day) => (
+                                                            <div key={day.dayNumber} className="mb-3">
+                                                                <h6 className="fw-bold">
+                                                                    Ngày {day.dayNumber}
+                                                                </h6>
+                                                                {day.places.map((place) => {
+                                                                    const isActive =
+                                                                        selectedPlaceForAI &&
+                                                                        selectedPlaceForAI.targetPlaceName ===
+                                                                        place.name &&
+                                                                        selectedPlaceForAI.targetDayNumber ===
+                                                                        day.dayNumber;
+
+                                                                    const isAi = place.isAiSuggestion;
+
+                                                                    return (
+                                                                        <div
+                                                                            key={place.id || place.name}
+                                                                            className={
+                                                                                "border rounded-3 p-2 mb-2 bg-white place-card " +
+                                                                                (isActive ? "place-card-active " : "") +
+                                                                                (isAi ? "place-card-ai " : "")
+                                                                            }
+                                                                            onClick={() =>
+                                                                                handlePlaceClick(day, place)
+                                                                            }
+                                                                            onDoubleClick={() =>
+                                                                                handlePlaceDoubleClick(day, place)
+                                                                            }
+                                                                        >
+                                                                            <div className="d-flex justify-content-between align-items-start">
+                                                                                <div>
+                                                                                    <div className="d-flex align-items-center gap-2">
+                                                                                        <strong>{place.name}</strong>
+                                                                                        {isAi && (
+                                                                                            <span className="badge bg-info-subtle text-primary">
+                                                                                                Gợi ý từ Trợ lý AI
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </div>
                                                                                 <div className="d-flex align-items-center gap-2">
-                                                                                    <strong>{place.name}</strong>
-                                                                                    {isAi && (
-                                                                                        <span className="badge bg-info-subtle text-primary">
-                                                                                            Gợi ý từ Trợ lý AI
+                                                                                    {place.time && (
+                                                                                        <span className="small text-muted">
+                                                                                            {place.time}
                                                                                         </span>
+                                                                                    )}
+                                                                                    {isAi && (
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            className="btn btn-link btn-sm text-danger p-0"
+                                                                                            onClick={(e) => {
+                                                                                                e.stopPropagation();
+                                                                                                handleDeleteAiSuggestion(
+                                                                                                    plan.id,
+                                                                                                    day.dayNumber,
+                                                                                                    place.id || place.name
+                                                                                                );
+                                                                                            }}
+                                                                                        >
+                                                                                            Xóa
+                                                                                        </button>
                                                                                     )}
                                                                                 </div>
                                                                             </div>
-                                                                            <div className="d-flex align-items-center gap-2">
-                                                                                {place.time && (
-                                                                                    <span className="small text-muted">
-                                                                                        {place.time}
-                                                                                    </span>
-                                                                                )}
-                                                                                {isAi && (
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        className="btn btn-link btn-sm text-danger p-0"
-                                                                                        onClick={(e) => {
-                                                                                            e.stopPropagation();
-                                                                                            handleDeleteAiSuggestion(
-                                                                                                plan.id,
-                                                                                                day.dayNumber,
-                                                                                                place.id || place.name
-                                                                                            );
-                                                                                        }}
-                                                                                    >
-                                                                                        Xóa
-                                                                                    </button>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
 
-                                                                        {place.description && (
-                                                                            <p className="mb-0 small">
-                                                                                {place.description}
-                                                                            </p>
-                                                                        )}
-                                                                        {typeof place.cost === "number" && (
-                                                                            <p className="mb-0 small text-muted">
-                                                                                Chi phí:{" "}
-                                                                                {place.cost.toLocaleString("vi-VN")} đ
-                                                                            </p>
-                                                                        )}
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    ))
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
+                                                                            {place.description && (
+                                                                                <p className="mb-0 small">
+                                                                                    {place.description}
+                                                                                </p>
+                                                                            )}
+                                                                            {typeof place.cost === "number" && (
+                                                                                <p className="mb-0 small text-muted">
+                                                                                    Chi phí:{" "}
+                                                                                    {place.cost.toLocaleString("vi-VN")} đ
+                                                                                </p>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        ))
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </section>
                     )}
                 </div>
 
-                {/* ================== Cột phải: Trợ lý AI ================== */}
                 <div className="col-lg-4">
                     <div className="card shadow-sm border-0 itinerary-card sticky-chat">
                         <div className="card-body d-flex flex-column chat-ai-root">
@@ -857,7 +924,6 @@ const Itinerary = () => {
                 </div>
             </div>
 
-            {/* ===== Modal chi tiết địa điểm (double click) ===== */}
             {detailPlace && (
                 <div
                     className="custom-modal-backdrop"
@@ -883,7 +949,6 @@ const Itinerary = () => {
                         <div className="custom-modal-body">
                             {detailPlace.name && (
                                 <div className="place-map-wrapper mb-3">
-                                    {/* Dùng Google Maps embed KHÔNG cần API key để tránh lỗi */}
                                     <iframe
                                         className="place-map-frame"
                                         src={`https://www.google.com/maps?q=${encodeURIComponent(
@@ -902,8 +967,8 @@ const Itinerary = () => {
                                 {trip.meta?.reason || trip.name} · Ngày {detailPlace.dayNumber}
                                 <br />
                                 ⏰ Thời gian:{" "}
-                                <strong>{detailPlace.time || "Không rõ"}</strong> · 💰 Chi
-                                phí ước tính:{" "}
+                                <strong>{detailPlace.time || "Không rõ"}</strong> · 💰 Chi phí
+                                ước tính:{" "}
                                 <strong>
                                     {typeof detailPlace.cost === "number"
                                         ? detailPlace.cost.toLocaleString("vi-VN") + " đ"
@@ -919,9 +984,9 @@ const Itinerary = () => {
                                 <div className="col-md-6">
                                     <h6 className="fw-bold">Gợi ý trải nghiệm</h6>
                                     <p className="small mb-0">
-                                        Thử chụp vài bức ảnh &quot;signature&quot;, nếm thử món
-                                        đặc sản quanh khu vực và ghi lại cảm xúc trong JourniAI sau
-                                        mỗi điểm dừng nhé.
+                                        Thử chụp vài bức ảnh "signature", nếm thử món đặc sản quanh
+                                        khu vực và ghi lại cảm xúc trong JourniAI sau mỗi điểm dừng
+                                        nhé.
                                     </p>
                                 </div>
                                 <div className="col-md-6">
@@ -929,8 +994,8 @@ const Itinerary = () => {
                                     <p className="small mb-0">
                                         Nếu bạn thích nơi này, hãy dùng Trợ lý AI để hỏi thêm:{" "}
                                         <em>
-                                            &quot;ngày {detailPlace.dayNumber}: gợi ý thêm địa điểm
-                                            gần {detailPlace.name}&quot;
+                                            "ngày {detailPlace.dayNumber}: gợi ý thêm địa điểm gần{" "}
+                                            {detailPlace.name}"
                                         </em>
                                         .
                                     </p>
