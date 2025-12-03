@@ -1,0 +1,741 @@
+/* :root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+a:hover {
+  color: #535bf2;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #1a1a1a;
+  cursor: pointer;
+  transition: border-color 0.25s;
+}
+button:hover {
+  border-color: #646cff;
+}
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color: #213547;
+    background-color: #ffffff;
+  }
+  a:hover {
+    color: #747bff;
+  }
+  button {
+    background-color: #f9f9f9;
+  }
+} */
+
+/* 🌍 Toàn bộ giao diện website JourniAI */
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&family=Poppins:wght@400;600&display=swap");
+
+:root {
+  --primary-color: #0077b6;
+  --primary-soft: #e0f4ff;
+  --accent-color: #00b4d8;
+  --accent-soft: #e0fbff;
+  --highlight-color: #ff6b6b;
+  --background-light: #f6f9fc;
+  --text-color: #222;
+  --muted-text: #667085;
+  --card-bg: #ffffff;
+  --border-subtle: #e4e7ec;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --shadow-soft: 0 8px 22px rgba(15, 23, 42, 0.06);
+  --shadow-hover: 0 14px 38px rgba(15, 23, 42, 0.13);
+  /* thêm biến shadow dùng cho map / modal */
+  --shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+}
+
+/* ===== RESET CƠ BẢN ===== */
+
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100vh;
+}
+
+body {
+  background: radial-gradient(circle at top left,
+      #d9f3ff 0,
+      #f6f9fc 45%,
+      #e0f7fa 100%);
+  font-family: "Poppins", sans-serif;
+  color: var(--text-color);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ===== HEADER CHUNG / NAVBAR ===== */
+
+header {
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(14px);
+  box-shadow: var(--shadow-soft);
+  border-radius: 16px;
+  padding: 1.25rem 1.75rem;
+  margin-bottom: 2rem;
+}
+
+header h2 {
+  font-family: "Montserrat", sans-serif;
+  color: var(--highlight-color);
+  letter-spacing: 0.03em;
+}
+
+/* ===== CARD CHUNG ===== */
+
+.card {
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-soft);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background-color: var(--card-bg);
+  transition: transform 0.22s ease, box-shadow 0.22s ease,
+    border-color 0.22s ease;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-hover);
+  border-color: rgba(148, 163, 184, 0.25);
+}
+
+/* ===== INPUT / FORM ===== */
+
+input.form-control,
+textarea.form-control,
+select.form-select {
+  border-radius: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-subtle);
+  font-size: 15px;
+  color: var(--text-color);
+  background-color: #ffffff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease,
+    background-color 0.2s ease, transform 0.08s ease;
+}
+
+input.form-control::placeholder,
+textarea.form-control::placeholder {
+  color: #9ca3af;
+}
+
+input.form-control:focus,
+textarea.form-control:focus,
+select.form-select:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px rgba(0, 180, 216, 0.25);
+  outline: none;
+  background-color: #fafdff;
+  transform: translateY(-1px);
+}
+
+/* ===== NÚT ===== */
+
+button.btn {
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: background-color 0.2s ease, transform 0.18s ease,
+    box-shadow 0.18s ease, color 0.15s ease;
+}
+
+button.btn-sm {
+  border-radius: 999px;
+  font-weight: 500;
+}
+
+button.btn-primary {
+  background: linear-gradient(135deg, var(--primary-color), #0096c7);
+  border: none;
+  box-shadow: 0 8px 18px rgba(0, 119, 182, 0.32);
+}
+
+button.btn-primary:hover {
+  background: linear-gradient(135deg, #0096c7, var(--accent-color));
+  transform: translateY(-2px);
+  box-shadow: 0 12px 26px rgba(0, 119, 182, 0.4);
+}
+
+button.btn-outline-danger {
+  border-radius: 999px;
+  border-width: 2px;
+}
+
+button.btn-outline-primary {
+  border-radius: 999px;
+}
+
+button.btn-link {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+button.btn-link:hover {
+  text-decoration: underline;
+}
+
+/* ===== AUTH (LOGIN / REGISTER) ===== */
+
+.auth-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 90vh;
+  padding: 1.5rem;
+}
+
+.auth-card {
+  background: radial-gradient(circle at top left,
+      #e0f4ff 0,
+      #ffffff 55%,
+      #f6f9ff 100%);
+  padding: 2.5rem 2.75rem;
+  border-radius: 22px;
+  box-shadow: var(--shadow-hover);
+  width: 100%;
+  max-width: 430px;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.auth-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.22);
+}
+
+.auth-title {
+  font-family: "Montserrat", sans-serif;
+  color: var(--highlight-color);
+  text-align: center;
+  margin-bottom: 0.4rem;
+  letter-spacing: 0.04em;
+}
+
+.auth-subtitle {
+  color: var(--muted-text);
+  text-align: center;
+  margin-bottom: 2rem;
+  font-size: 0.9rem;
+}
+
+.form-check-label {
+  font-size: 14px;
+  color: #555;
+}
+
+/* ===== DASHBOARD – DANH SÁCH TRIP ===== */
+
+.trip-card {
+  background: #e0f7fa;
+  border-radius: 18px;
+  padding: 1.2rem 1.25rem;
+  box-shadow: var(--shadow-soft);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.trip-card:hover {
+  transform: translateY(-3px);
+  background: #caf0f8;
+  box-shadow: var(--shadow-hover);
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+/* ===== HIỆU ỨNG FADE-IN ===== */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.5s ease forwards;
+}
+
+/* =========================================================
+   ITINERARY PAGE
+   ======================================================= */
+
+.itinerary-page {
+  max-width: 1100px;
+}
+
+/* Card bao khung form mô tả & trợ lý AI */
+.itinerary-card {
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+/* Card từng lịch trình (plan) */
+.plan-card {
+  border-radius: 18px;
+  background: #f8fcff;
+  overflow: hidden;
+}
+
+.plan-card .card-header {
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+  background: linear-gradient(90deg, #f5fbff, #edf6ff);
+}
+
+.plan-card .card-body {
+  background: #f9fdff;
+}
+
+/* Địa điểm trong từng ngày */
+.place-card {
+  cursor: pointer;
+  border-radius: 12px;
+  transition: box-shadow 0.18s ease, transform 0.18s ease,
+    border-color 0.18s ease, background-color 0.15s ease;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+.place-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+  background-color: #ffffff;
+}
+
+.place-card-active {
+  border: 2px solid #0d6efd;
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.2);
+  background: linear-gradient(135deg, #eef4ff, #f5fbff);
+}
+
+/* ===== TRỢ LÝ AI DÍNH THEO KHI CUỘN (CỘT PHẢI) ===== */
+
+.sticky-chat {
+  position: sticky;
+  top: 80px;
+  /* giới hạn chiều cao tối đa của card trợ lý AI */
+  max-height: calc(100vh - 120px);
+}
+
+/* khi dùng class h-100 từ bootstrap thì không cho full chiều cao cột */
+.sticky-chat.h-100 {
+  height: auto !important;
+}
+
+/* card-body bên trong trợ lý AI: cho phép nội dung chat cuộn gọn */
+.sticky-chat .card-body {
+  display: flex;
+  flex-direction: column;
+  max-height: 100%;
+  /* cho phép cuộn toàn bộ panel khi nội dung cao hơn khung */
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Banner nhỏ hiển thị địa điểm đang chọn cho AI */
+.selected-place-banner {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg,
+      rgba(13, 110, 253, 0.08),
+      rgba(0, 180, 216, 0.08));
+  font-size: 12px;
+  color: #0b5ed7;
+  margin-bottom: 10px;
+}
+
+/* =========================================================
+   MODAL ĐỊA ĐIỂM (DOUBLE-CLICK)
+   ======================================================= */
+
+.custom-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+}
+
+.custom-modal {
+  max-width: 760px;
+  width: 96%;
+  max-height: 90vh;
+  background: #ffffff;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.32);
+  display: flex;
+  flex-direction: column;
+}
+
+.custom-modal-header {
+  padding: 16px 22px 10px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(135deg, #e0f4ff, #ffffff);
+}
+
+.custom-modal-title {
+  font-weight: 600;
+  font-family: "Montserrat", sans-serif;
+}
+
+.custom-modal-body {
+  padding: 18px 22px 22px;
+  overflow-y: auto;
+}
+
+/* Nút đóng modal */
+.custom-modal-close {
+  border-radius: 999px;
+  border: none;
+  padding: 4px 10px;
+  font-size: 0.85rem;
+}
+
+/* =========================================================
+   RESPONSIVE
+   ======================================================= */
+
+@media (max-width: 991.98px) {
+  header {
+    padding: 1.1rem 1.4rem;
+  }
+
+  .auth-card {
+    padding: 2.1rem 2.2rem;
+  }
+
+  .sticky-chat {
+    position: static;
+    margin-top: 1rem;
+    max-height: none;
+  }
+}
+
+@media (max-width: 575.98px) {
+  body {
+    background: #f1f8ff;
+  }
+
+  header {
+    margin-bottom: 1.3rem;
+  }
+
+  .auth-card {
+    padding: 1.8rem 1.7rem;
+    border-radius: 18px;
+  }
+
+  .plan-card {
+    border-radius: 14px;
+  }
+
+  .custom-modal {
+    max-height: 88vh;
+  }
+
+  .custom-modal-body {
+    padding: 14px 16px 18px;
+  }
+}
+
+/* ==== Map trong modal địa điểm ==== */
+.place-map-wrapper {
+  width: 100%;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.place-map-frame {
+  width: 100%;
+  height: 260px;
+  border: 0;
+}
+
+/* ==== Chat AI panel cũ – vẫn giữ để tránh lỗi nếu còn dùng ==== */
+.chat-ai-panel {
+  border-radius: 18px;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-context-box {
+  background: #f1f5ff;
+  border-radius: 12px;
+  padding: 6px 10px;
+}
+
+/* =========================================================
+   CHAT AI V2 – PHÙ HỢP VỚI ChatAI.jsx MỚI
+   ======================================================= */
+
+.chat-ai-body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.chat-ai-root {
+  height: 100%;
+}
+
+.chat-ai-header {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  padding-bottom: 0.25rem;
+}
+
+/* KHUNG CUỘN CHUNG: hội thoại + gợi ý */
+.chat-ai-scroll-area {
+  background: #f9fbff;
+  border-radius: 16px;
+  padding: 10px 12px;
+  flex: 1;
+  overflow-y: auto;
+  max-height: 420px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+/* scrollbar gọn cho khung chat */
+.chat-ai-scroll-area::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-ai-scroll-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-ai-scroll-area::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.6);
+  border-radius: 999px;
+}
+
+.chat-ai-scroll-area::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.8);
+}
+
+/* Hội thoại bên trong – không cuộn nữa, chỉ dùng margin/padding nhẹ */
+.chat-ai-messages {
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  margin-bottom: 4px;
+}
+
+.chat-ai-message {
+  display: flex;
+}
+
+.chat-ai-message-user {
+  justify-content: flex-end;
+}
+
+.chat-ai-message-bot {
+  justify-content: flex-start;
+}
+
+.chat-ai-bubble {
+  max-width: 100%;
+  border-radius: 16px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.chat-ai-message-user .chat-ai-bubble {
+  background: #0d6efd;
+  color: #fff;
+  margin-left: auto;
+}
+
+.chat-ai-message-bot .chat-ai-bubble {
+  background: #f5f7ff;
+  color: #333;
+  margin-right: auto;
+}
+
+.chat-ai-suggestion .card-body {
+  font-size: 13px;
+}
+
+/* KHUNG GỢI Ý – bo góc + border nét đứt để dễ nhìn */
+.chat-ai-suggestions-box {
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px dashed #cbd5ff;
+  padding: 6px 8px;
+}
+
+/* Danh sách gợi ý – có scroll riêng */
+.chat-ai-suggestions {
+  max-height: 180px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+/* scrollbar nhỏ trong list gợi ý */
+.chat-ai-suggestions::-webkit-scrollbar {
+  width: 5px;
+}
+
+.chat-ai-suggestions::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.7);
+  border-radius: 999px;
+}
+
+.chat-ai-suggestions::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-ai-input textarea {
+  border-radius: 12px;
+  resize: none;
+  min-height: 70px;
+  max-height: 120px;
+}
+
+/* khung input + nút Gửi giống thanh chat */
+.chat-ai-input .input-group {
+  background: #ffffff;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+}
+
+.chat-ai-input .form-control {
+  border: none;
+  box-shadow: none;
+}
+
+.chat-ai-input .form-control:focus {
+  border: none;
+  box-shadow: none;
+}
+
+.chat-ai-input .btn-primary {
+  border-radius: 0 18px 18px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 18px;
+  font-weight: 600;
+}
+
+/* Gợi ý từ AI hiển thị trong lịch trình */
+.place-card-ai {
+  background: #f5fbff;
+}
+
+/* ===== Modal Booking khách sạn – luôn ở giữa màn hình, không giật ===== */
+
+.hotel-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(15, 23, 42, 0.45); /* lớp mờ tối phía sau */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000; /* cao hơn mọi card / header */
+}
+
+.hotel-modal {
+  width: min(480px, 94vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #ffffff;
+  border-radius: 24px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.35);
+  padding: 1.4rem 1.6rem;
+}
+
+/* Map trong modal booking & modal địa điểm */
+.itinerary-map-embed iframe,
+.hotel-modal-map iframe {
+  border: 0;
+}
+
+/* ==== Booking modal + map cũ (nếu còn dùng) ==== */
+
+.booking-modal {
+  max-width: 900px;
+}
+
+.booking-map-wrapper {
+  width: 100%;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.booking-map-frame {
+  width: 100%;
+  height: 260px;
+  border: 0;
+}
